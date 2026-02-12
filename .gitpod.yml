@@ -1,0 +1,20 @@
+image: gitpod/workspace-node-lts
+
+tasks:
+  - name: setup
+    init: |
+      [ -f .env ] || cp .env.example .env
+      npm ci
+      npm run prisma:generate
+      npm run prisma:push
+    command: npm run dev
+
+ports:
+  - port: 8000
+    onOpen: open-preview
+    visibility: public
+
+vscode:
+  extensions:
+    - dbaeumer.vscode-eslint
+    - esbenp.prettier-vscode

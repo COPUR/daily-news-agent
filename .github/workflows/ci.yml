@@ -1,0 +1,72 @@
+name: CI/CD
+
+on:
+  push:
+    branches: ["master", "main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  node-quality:
+    name: Node Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Install
+        run: npm ci
+
+      - name: Prisma generate
+        run: npm run prisma:generate
+
+      - name: Prisma push
+        run: npm run prisma:push
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  node-docker:
+    name: Node Docker Build
+    runs-on: ubuntu-latest
+    needs: node-quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t daily-news-agent:ci .
+
+  gitpod-parity:
+    name: Gitpod Parity
+    runs-on: ubuntu-latest
+    needs: node-quality
+    container:
+      image: gitpod/workspace-node-lts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Gitpod bootstrap parity
+        run: |
+          cp .env.example .env
+          npm ci
+          npm run prisma:generate
+          npm run prisma:push
+          npm run build

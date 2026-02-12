@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Daily News Agent - Node</title>
+    <link rel="stylesheet" href="/dashboard/style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <header class="app-header">
+      <h1>Daily News Agent</h1>
+      <p>Node.js dashboard for sources, pipeline, observability, newsletter workflow, and revision governance.</p>
+      <div class="row top-actions">
+        <button id="runPipelineBtn">Run Pipeline</button>
+        <label>
+          Language
+          <select id="outputLanguage">
+            <option value="en">en</option>
+            <option value="tr">tr</option>
+          </select>
+        </label>
+        <span id="healthBadge">checking...</span>
+      </div>
+    </header>
+
+    <nav class="tab-nav">
+      <button data-tab="overview" class="active">Overview</button>
+      <button data-tab="sources">Sources</button>
+      <button data-tab="news">News</button>
+      <button data-tab="observability">Observability</button>
+      <button data-tab="newsletter">Newsletter</button>
+      <button data-tab="versions">Version Studio</button>
+      <button data-tab="config">Config & Secrets</button>
+      <button data-tab="logs">Logs</button>
+    </nav>
+
+    <main class="app-main">
+      <section id="tab-overview" class="tab active">
+        <h2>Overview</h2>
+        <div id="statsCards" class="cards"></div>
+        <h3>Latest Post</h3>
+        <article id="latestPost"></article>
+        <h3>Pipeline Runs</h3>
+        <div id="runsTable"></div>
+      </section>
+
+      <section id="tab-sources" class="tab">
+        <h2>Sources</h2>
+        <div class="row">
+          <input id="sourceIdInput" placeholder="Source ID (empty=create)" />
+          <select id="sourceTypeInput">
+            <option value="rss">rss</option>
+            <option value="scrape">scrape</option>
+            <option value="x">x</option>
+            <option value="grok">grok</option>
+          </select>
+          <input id="sourceNameInput" placeholder="Source name" />
+          <input id="sourcePollingInput" placeholder="Polling minutes" value="1440" />
+          <select id="sourceEnabledInput">
+            <option value="true">enabled</option>
+            <option value="false">disabled</option>
+          </select>
+        </div>
+        <label>Tags JSON <textarea id="sourceTagsInput" rows="2">[]</textarea></label>
+        <label>Config JSON <textarea id="sourceConfigInput" rows="4">{}</textarea></label>
+        <label>Auth JSON (optional) <textarea id="sourceAuthInput" rows="2">null</textarea></label>
+        <div class="row">
+          <button id="sourceSaveBtn">Create / Update Source</button>
+          <input id="sourceToggleIdInput" placeholder="Toggle source ID" />
+          <select id="sourceToggleEnabledInput">
+            <option value="true">enable</option>
+            <option value="false">disable</option>
+          </select>
+          <button id="sourceToggleBtn">Toggle</button>
+          <input id="sourceDeleteIdInput" placeholder="Delete source ID" />
+          <button id="sourceDeleteBtn">Delete</button>
+        </div>
+        <div id="sourcesTable"></div>
+      </section>
+
+      <section id="tab-news" class="tab">
+        <h2>News History</h2>
+        <div class="row">
+          <input id="newsArticleIdInput" placeholder="Article ID" />
+          <select id="newsStatusInput">
+            <option value="new">new</option>
+            <option value="duplicate">duplicate</option>
+            <option value="ignored">ignored</option>
+            <option value="selected">selected</option>
+          </select>
+          <button id="newsStatusBtn">Update Status</button>
+          <input id="newsClusterIdInput" placeholder="Cluster ID" />
+          <button id="newsClusterBtn">View Cluster</button>
+        </div>
+        <div id="newsClusterDetails"></div>
+        <div id="newsTable"></div>
+      </section>
+
+      <section id="tab-observability" class="tab">
+        <h2>Observability</h2>
+        <div class="row">
+          <canvas id="articlesChart"></canvas>
+          <canvas id="runsChart"></canvas>
+        </div>
+        <div id="recoveryMetrics"></div>
+      </section>
+
+      <section id="tab-newsletter" class="tab">
+        <h2>Newsletter Preview</h2>
+        <div class="row">
+          <label>Status <select id="newsletterStatus"><option value="">all</option><option>draft</option><option>authorized</option><option>posted</option><option>manual_posted</option><option>deleted</option></select></label>
+          <button id="refreshNewsletter">Refresh</button>
+        </div>
+        <div id="newsletterDocs"></div>
+        <div id="newsletterEditor"></div>
+      </section>
+
+      <section id="tab-versions" class="tab">
+        <h2>Version Studio</h2>
+        <p class="muted">Inspect version payloads, metadata, result deltas, transaction events, and integration logs.</p>
+        <div class="row vs-toolbar">
+          <label>Document
+            <select id="versionDocSelect"></select>
+          </label>
+          <label>Collection
+            <select id="versionCollectionSelect"></select>
+          </label>
+          <label>Language
+            <select id="versionLanguageSelect">
+              <option value="en">en</option>
+              <option value="tr">tr</option>
+            </select>
+          </label>
+          <button id="versionLayoutSwitch" type="button" title="Switch Version Studio layout">Layout: Stacked</button>
+          <button id="versionRefreshBtn">Refresh Version Data</button>
+        </div>
+        <div class="version-studio-grid">
+          <section class="vs-panel">
+            <h3>Version History</h3>
+            <div id="versionHistoryTable"></div>
+          </section>
+          <section class="vs-panel">
+            <h3>Version Inspector</h3>
+            <div id="versionInspector"><p class="muted">Select a versionId to inspect full details.</p></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="tab-config" class="tab">
+        <h2>Config & Secrets</h2>
+        <div class="row">
+          <input id="configKeyInput" placeholder="Config key (e.g. DAILY_POST_LANGUAGE)" />
+          <input id="configValueInput" placeholder="Value" />
+          <button id="configUpdateBtn">Update Config</button>
+        </div>
+        <div id="configTable"></div>
+        <div class="row">
+          <input id="secretKeyInput" placeholder="Secret key (e.g. OPENAI_API_KEY)" />
+          <input id="secretValueInput" placeholder="Secret value" />
+          <button id="secretSetBtn">Set Secret</button>
+          <button id="secretClearBtn">Clear Secret</button>
+        </div>
+        <div id="secretsTable"></div>
+      </section>
+
+      <section id="tab-logs" class="tab">
+        <h2>Recent Logs</h2>
+        <div class="row">
+          <label>Level
+            <select id="logsLevel">
+              <option value="">all</option>
+              <option value="info">info</option>
+              <option value="warning">warning</option>
+              <option value="error">error</option>
+            </select>
+          </label>
+          <label>Limit <input id="logsLimit" value="100" /></label>
+          <button id="logsRefreshBtn">Refresh Logs</button>
+        </div>
+        <div id="logsTable"></div>
+      </section>
+    </main>
+
+    <script type="module" src="/dashboard/app.js"></script>
+  </body>
+</html>

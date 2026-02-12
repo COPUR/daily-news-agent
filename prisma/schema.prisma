@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum SourceType {
+  rss
+  scrape
+  x
+  grok
+}
+
+enum Topic {
+  AV
+  VEHICLE_SOFTWARE
+  BMS
+  BATTERY
+  SDV
+  EV
+  OTHER
+}
+
+enum ArticleStatus {
+  new
+  duplicate
+  ignored
+  selected
+}
+
+enum RunStatus {
+  running
+  success
+  failed
+}
+
+enum RunTrigger {
+  scheduled
+  manual
+  api
+}
+
+model Source {
+  id             Int      @id @default(autoincrement())
+  sourceType     SourceType
+  name           String   @unique
+  enabled        Boolean  @default(true)
+  pollingMinutes Int      @default(1440)
+  tagsJson       String?
+  configJson     String
+  authJson       String?
+  lastFetchedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  rawItems       RawItem[]
+  articles       Article[]
+  logs           PipelineLog[]
+
+  @@index([sourceType])
+  @@index([enabled])
+}
+
+model RawItem {
+  id            Int      @id @default(autoincrement())
+  sourceId      Int
+  runId         String
+  externalId    String?
+  title         String
+  url           String
+  normalizedUrl String
+  publishedAt   DateTime?
+  author        String?
+  summary       String?
+  rawPayload    String?
+  fetchedAt     DateTime @default(now())
+
+  source        Source   @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  article       Article?
+
+  @@index([runId])
+  @@index([sourceId, publishedAt])
+  @@index([normalizedUrl])
+}
+
+model DedupCluster {
+  id               Int      @id @default(autoincrement())
+  primaryArticleId Int?     @unique
+  methodSummary    String?
+  createdAt        DateTime @default(now())
+
+  primaryArticle   Article?  @relation("ClusterPrimary", fields: [primaryArticleId], references: [id], onDelete: SetNull)
+  articles         Article[] @relation("ClusterMembers")
+
+  @@index([primaryArticleId])
+}
+
+model Article {
+  id                Int           @id @default(autoincrement())
+  sourceId          Int
+  rawItemId         Int?          @unique
+  title             String
+  url               String
+  normalizedUrl     String
+  canonicalDomain   String?
+  publishedAt       DateTime?
+  author            String?
+  summary           String?
+  fullText          String?
+  language          String        @default("en")
+  tagsJson          String?
+  entitiesJson      String?
+  topic             Topic         @default(OTHER)
+  sentiment         Float?
+  simhashValue      String?
+  contentFingerprint String?
+  embedding         Bytes?
+  status            ArticleStatus @default(new)
+  clusterId         Int?
+  relevanceScore    Float?
+  extractedFactsJson String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  source            Source        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  rawItem           RawItem?      @relation(fields: [rawItemId], references: [id], onDelete: SetNull)
+  cluster           DedupCluster? @relation("ClusterMembers", fields: [clusterId], references: [id], onDelete: SetNull)
+  clusterPrimary    DedupCluster? @relation("ClusterPrimary")
+  relatedLinks      RelatedLink[]
+  dailyPostItems    DailyPostItem[]
+
+  @@index([publishedAt, topic])
+  @@index([status])
+  @@index([normalizedUrl])
+  @@index([sourceId])
+  @@index([clusterId])
+}
+
+model RelatedLink {
+  id           Int      @id @default(autoincrement())
+  articleId    Int
+  url          String
+  title        String?
+  snippet      String?
+  sourceEngine String   @default("serper")
+  createdAt    DateTime @default(now())
+
+  article      Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+}
+
+model DailyPost {
+  id             Int      @id @default(autoincrement())
+  postDate       String   @unique
+  headline       String
+  contentMarkdown String
+  contentText    String
+  generatedBy    String
+  metadataJson   String?
+  createdAt      DateTime @default(now())
+
+  items          DailyPostItem[]
+
+  @@index([postDate])
+}
+
+model DailyPostItem {
+  id        Int    @id @default(autoincrement())
+  postId    Int
+  articleId Int
+  position  Int
+  rationale String?
+
+  post      DailyPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  article   Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, articleId])
+  @@index([postId])
+  @@index([articleId])
+}
+
+model PipelineRun {
+  id             String    @id
+  trigger        RunTrigger
+  status         RunStatus
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  durationMs     Int?
+  itemsIngested  Int       @default(0)
+  itemsNormalized Int      @default(0)
+  duplicatesCount Int      @default(0)
+  errorsCount    Int       @default(0)
+  selectedCount  Int       @default(0)
+  summaryJson    String?
+
+  logs           PipelineLog[]
+
+  @@index([status])
+}
+
+model PipelineLog {
+  id         Int      @id @default(autoincrement())
+  runId      String
+  ts         DateTime @default(now())
+  level      String
+  step       String
+  sourceId   Int?
+  message    String
+  payloadJson String?
+  durationMs Int?
+
+  run        PipelineRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  source     Source?     @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+
+  @@index([runId, ts])
+  @@index([level])
+  @@index([step])
+}
