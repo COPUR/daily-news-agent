@@ -1,6 +1,6 @@
 # Daily News Agent (Node.js)
 
-Local-first EV/SDV/Battery news agent implemented in Node.js.
+Local-first news agent implemented in Node.js.
 
 ## Stack
 - Node.js 20+
@@ -15,7 +15,7 @@ Local-first EV/SDV/Battery news agent implemented in Node.js.
 - Enrichment: full-text extraction, key facts, optional related links via Serper.
 - Dedup: URL normalization + title similarity + SimHash + embedding cosine.
 - Ranking: priority order
-  `Tesla > Hypercars > NVIDIA > Openpilot > BYD > AV > Vehicle Software > BMS > Battery > SDV > EV > Other`.
+  
 - One daily post in `en` or `tr` with citations.
 - Newsletter lifecycle in local NoSQL document store:
   document-level `draft -> authorized -> posted`, plus `manual_posted` and `deleted`,
