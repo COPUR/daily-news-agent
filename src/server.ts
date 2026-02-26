@@ -1,5 +1,4 @@
 import http from "node:http";
-import path from "node:path";
 import express from "express";
 import cors from "cors";
 import { env } from "./config/env.js";
@@ -9,14 +8,18 @@ import { prisma } from "./db/client.js";
 import { startScheduler, stopScheduler } from "./services/scheduler.js";
 
 const app = express();
+app.disable("x-powered-by");
+app.use((_request, reply, next) => {
+  reply.setHeader("X-Content-Type-Options", "nosniff");
+  reply.setHeader("X-Frame-Options", "DENY");
+  reply.setHeader("Referrer-Policy", "no-referrer");
+  reply.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  reply.setHeader("Cross-Origin-Resource-Policy", "same-origin");
+  next();
+});
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: "2mb" }));
 app.use(express.urlencoded({ extended: true }));
-
-app.use(express.static(path.resolve(process.cwd(), "public")));
-app.get("/", (_request, reply) => {
-  reply.redirect("/dashboard/");
-});
 
 app.use(createApiRouter());
 

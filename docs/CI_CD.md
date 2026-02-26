@@ -19,6 +19,7 @@ Triggers:
 Jobs:
 
 1. `node-quality`
+   - `npm run verify:public`
    - `npm ci`
    - `npm run prisma:generate`
    - `npm run prisma:push`
@@ -62,6 +63,7 @@ Recommended branch protection for Node delivery:
 From `/path/to/daily-news-agent`:
 
 ```bash
+npm run verify:public
 npm install
 npm run prisma:generate
 npm run prisma:push
@@ -85,7 +87,7 @@ Recommended promotion flow:
 4. Run post-deploy health checks:
    - `/health`
    - `/health/verbose`
-   - dashboard smoke at `/dashboard/`
+   - dashboard-service smoke at `http://127.0.0.1:8001/dashboard/` (separate repo)
 
 ## 6) Proposed Node Release Workflow (Gap)
 

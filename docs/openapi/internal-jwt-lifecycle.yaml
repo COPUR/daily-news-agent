@@ -1,0 +1,199 @@
+openapi: 3.0.3
+info:
+  title: Internal JWT Lifecycle Service
+  version: 1.1.0
+  description: >
+    Internal-only JWT service. Do not expose on public networks.
+    Token lifecycle is stateful: active sessions are tracked in SQLite and revoked on logout.
+servers:
+  - url: http://internal-network
+    description: Internal backend network only
+paths:
+  /authenticate:
+    post:
+      summary: Authenticate and issue JWT
+      operationId: authenticateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: JWT issued
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /logout:
+    post:
+      summary: Invalidate current JWT
+      operationId: logoutUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token invalidated
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LogoutResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /business:
+    get:
+      summary: Validate secured access
+      operationId: getBusinessData
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated business response
+          headers:
+            Cache-Control:
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    BadRequest:
+      description: Invalid request payload
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing/invalid token or credentials
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    TooManyRequests:
+      description: Authentication rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+            minimum: 1
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal configuration/runtime error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        password:
+          type: string
+          minLength: 1
+          maxLength: 512
+    TokenResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - token
+        - tokenType
+        - expiresIn
+        - expiresAt
+      properties:
+        token:
+          type: string
+          description: JWT with jti/iss/aud/exp claims
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          minimum: 60
+        expiresAt:
+          type: string
+          format: date-time
+    LogoutResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - loggedOut
+      properties:
+        loggedOut:
+          type: boolean
+          example: true
+    BusinessResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - subject
+        - scope
+        - utcTime
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        subject:
+          type: string
+        scope:
+          type: array
+          items:
+            type: string
+        utcTime:
+          type: string
+          format: date-time
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - detail
+      properties:
+        detail:
+          type: string

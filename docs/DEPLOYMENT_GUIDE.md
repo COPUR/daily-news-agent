@@ -40,7 +40,6 @@ cp .env.example .env
 npm install
 npm run prisma:generate
 npm run prisma:push
-npm run seed
 npm run build
 npm run start
 ```
@@ -52,9 +51,16 @@ curl http://127.0.0.1:8000/health
 curl http://127.0.0.1:8000/health/verbose
 ```
 
-Open dashboard:
+UI is served by the separate dashboard-service repository:
 
-- `http://127.0.0.1:8000/dashboard/`
+- `http://127.0.0.1:8001/dashboard/`
+
+To run both services together in local dev:
+
+```bash
+cd /path/to/daily-news-agent
+npm run dev:with-dashboard
+```
 
 ## 5) Docker Deployment
 
@@ -139,6 +145,9 @@ For schema risk:
 - Use a reverse proxy/TLS for internet-facing deployment.
 - Limit filesystem permissions on data and runtime directories.
 - Monitor `/health/verbose` integration warnings.
+- Keep internal JWT service private-only (`/authenticate`, `/logout`, `/business`) and set strong `INTERNAL_AUTH_JWT_SECRET`.
+- Prefer `INTERNAL_AUTH_PASSWORD_HASH` (PBKDF2 format) over plaintext auth password.
+- For Keycloak gateway mode, verify `KEYCLOAK_*` values and ensure Keycloak client is configured as public client with PKCE (`S256`) and correct Web Origins/Redirect URIs (`/login/`).
 
 ## 10) Production Caveats
 
@@ -146,3 +155,26 @@ For schema risk:
 - SQLite is suitable for local-first and small deployments; for scale, migrate DB provider.
 - X posting requires full credential set and bearer verification flow.
 - LLM provider availability impacts refine/generation quality; fallback paths exist for post generation but refine expects strict JSON output.
+
+## 11) Gitpod Deployment
+
+Use Gitpod for cloud workspace deployment and preview:
+
+1. Open:
+   - `https://gitpod.io/#https://github.com/COPUR/daily-news-agent`
+2. Wait for `.gitpod.yml` bootstrap:
+   - copies `.env` from `.env.example` when missing
+   - creates `data/` and `.runtime/`
+   - runs `npm ci`, `npm run prisma:generate`, `npm run prisma:push`
+   - starts app with `npm run dev`
+3. Validate:
+   - `curl http://127.0.0.1:8000/health`
+   - `curl http://127.0.0.1:8000/health/verbose`
+4. Open dashboard service (separate repo):
+   - `http://127.0.0.1:8001/dashboard/`
+
+Set provider secrets in Gitpod workspace/project variables (for example `OPENAI_API_KEY`, `HUGGINGFACE_API_KEY`, `XAI_API_KEY`, X credentials, `SERPER_API_KEY`) and restart the workspace after updates.
+
+Persistence note:
+
+- `data/` and `.runtime/` live inside the workspace filesystem. Keep backups/export copies if you need data beyond workspace lifecycle.

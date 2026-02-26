@@ -26,8 +26,14 @@ This folder contains the active, implementation-level documentation for the Node
 - `IMPLEMENTATION_DOCUMENTATION.md`
   - Module-by-module implementation details
   - Pipeline and newsletter runtime behavior
-  - Dashboard and persistence implementation
+  - API service and persistence implementation
   - Extension and customization guide
+
+- `MIGRATION_GUARDRAILS.md`
+  - Public-repo safety rules for migration
+  - No business/database data policy
+  - SQL creation-script-only policy
+  - CI enforcement command
 
 - `DATA_JOURNEY.md`
   - End-to-end data lineage from source ingestion to posting
@@ -50,6 +56,18 @@ This folder contains the active, implementation-level documentation for the Node
   - Current GitHub Actions pipelines
   - CI gates and local parity commands
   - Release flow and gap analysis for Node image publishing
+
+- `SECURITY_CMMI_BASELINE.md`
+  - Internal JWT lifecycle service security controls
+  - CMMI-oriented validation, risk, and auditability mapping
+  - Configuration and residual risk checklist
+
+- `openapi/internal-jwt-lifecycle.yaml`
+  - OpenAPI 3.0 signature for internal JWT lifecycle endpoints
+
+- `openapi/keycloak-gateway-aaa.yaml`
+  - OpenAPI 3.0 signature for Keycloak gateway AAA endpoints
+  - Public auth config and role-based introspection routes
 
 ## Scope
 

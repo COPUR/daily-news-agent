@@ -1,0 +1,206 @@
+openapi: 3.0.3
+info:
+  title: Keycloak Gateway AAA
+  version: 1.0.0
+  description: >
+    API gateway layer with Keycloak-backed authentication, role-based authorization,
+    and request accounting controls.
+servers:
+  - url: http://internal-network
+    description: Internal backend network only
+paths:
+  /auth/config:
+    get:
+      summary: Public auth runtime configuration
+      operationId: getAuthConfig
+      responses:
+        '200':
+          description: Keycloak auth config for PKCE clients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthConfig'
+
+  /aaa/me:
+    get:
+      summary: Current authenticated principal
+      operationId: getCurrentPrincipal
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Authenticated principal metadata
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /aaa/policies:
+    get:
+      summary: Gateway policy catalog (admin roles)
+      operationId: getGatewayPolicies
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Route policy metadata
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PolicyEntry'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  responses:
+    Unauthorized:
+      description: Missing or invalid access token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: Authenticated user lacks required role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    AuthConfig:
+      type: object
+      additionalProperties: false
+      required:
+        - enabled
+        - provider
+        - issuer
+        - authorizationEndpoint
+        - tokenEndpoint
+        - endSessionEndpoint
+        - clientId
+        - audience
+        - scope
+        - pkceMethod
+      properties:
+        enabled:
+          type: boolean
+        provider:
+          type: string
+          enum: [keycloak]
+        issuer:
+          type: string
+        authorizationEndpoint:
+          type: string
+        tokenEndpoint:
+          type: string
+        endSessionEndpoint:
+          type: string
+        clientId:
+          type: string
+        audience:
+          type: string
+        scope:
+          type: string
+        pkceMethod:
+          type: string
+          enum: [S256]
+    MeResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - requestId
+        - policyId
+        - principal
+        - utcTime
+      properties:
+        requestId:
+          type: string
+        policyId:
+          type: string
+        principal:
+          $ref: '#/components/schemas/Principal'
+        utcTime:
+          type: string
+          format: date-time
+    Principal:
+      type: object
+      additionalProperties: false
+      required:
+        - subject
+        - roles
+      properties:
+        subject:
+          type: string
+        username:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        issuer:
+          type: string
+        audience:
+          type: array
+          items:
+            type: string
+        roles:
+          type: array
+          items:
+            type: string
+        realmRoles:
+          type: array
+          items:
+            type: string
+        clientRoles:
+          type: array
+          items:
+            type: string
+        tokenId:
+          type: string
+          nullable: true
+        expiresAt:
+          type: string
+          nullable: true
+    PolicyEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - description
+        - methods
+        - pathPattern
+        - allowPublic
+        - anyRoles
+      properties:
+        id:
+          type: string
+        description:
+          type: string
+        methods:
+          type: array
+          items:
+            type: string
+        pathPattern:
+          type: string
+        allowPublic:
+          type: boolean
+        anyRoles:
+          type: array
+          items:
+            type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - detail
+      properties:
+        detail:
+          type: string

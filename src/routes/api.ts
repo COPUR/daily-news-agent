@@ -18,6 +18,14 @@ import { parseJson, stringifyJson } from "../utils/json.js";
 import { newsletterStore } from "../services/newsletterStore.js";
 import { clearSecret, listConfig, listSecrets, setSecret, updateConfig } from "../services/runtimeAdmin.js";
 import { schedulerStatus } from "../services/scheduler.js";
+import {
+  InternalAuthError,
+  authenticateInternalUser,
+  authorizeBusinessAccess,
+  extractBearerToken,
+  logoutInternalToken,
+} from "../services/internalAuth.js";
+import { createGatewayMiddleware, gatewayPolicyCatalog, gatewayPublicAuthConfig } from "../services/keycloakGateway.js";
 
 function parseArticle(article: any) {
   return {
@@ -50,6 +58,16 @@ function sendError(reply: Response, error: unknown) {
   return reply.status(e.code).json({ detail: e.message });
 }
 
+function sendInternalAuthError(reply: Response, error: unknown) {
+  if (error instanceof InternalAuthError) {
+    if (error.retryAfterSeconds) {
+      reply.setHeader("Retry-After", String(error.retryAfterSeconds));
+    }
+    return reply.status(error.statusCode).json({ detail: error.message });
+  }
+  return sendError(reply, error);
+}
+
 type HealthStatus = "ok" | "warn" | "fail" | "skip";
 
 async function timedProbe<T>(fn: () => Promise<T>) {
@@ -72,9 +90,91 @@ async function timedProbe<T>(fn: () => Promise<T>) {
 
 export function createApiRouter() {
   const router = Router();
+  router.use(createGatewayMiddleware());
 
   router.get("/health", (_, reply) => {
     reply.json({ status: "ok", app: "Daily News Agent Node (Express)", utcTime: new Date().toISOString() });
+  });
+
+  router.get("/auth/config", (_, reply) => {
+    reply.setHeader("Cache-Control", "no-store");
+    reply.json(gatewayPublicAuthConfig());
+  });
+
+  router.get("/aaa/me", (request, reply) => {
+    const auth = request.gatewayContext;
+    if (!auth?.authenticated || !auth.principal) {
+      return reply.status(401).json({ detail: "Unauthorized" });
+    }
+    reply.json({
+      requestId: auth.requestId,
+      policyId: auth.policyId,
+      principal: auth.principal,
+      utcTime: new Date().toISOString(),
+    });
+  });
+
+  router.get("/aaa/policies", (_request, reply) => {
+    reply.json(gatewayPolicyCatalog());
+  });
+
+  router.post("/authenticate", async (request, reply) => {
+    try {
+      const result = await authenticateInternalUser({
+        username: (request.body as any)?.username,
+        password: (request.body as any)?.password,
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"],
+      });
+      reply.setHeader("Cache-Control", "no-store");
+      reply.json(result);
+    } catch (error) {
+      sendInternalAuthError(reply, error);
+    }
+  });
+
+  router.post("/logout", async (request, reply) => {
+    try {
+      const token = extractBearerToken(request.headers.authorization);
+      const result = await logoutInternalToken(token, {
+        ipAddress: request.ip,
+        userAgent: request.headers["user-agent"],
+      });
+      reply.setHeader("Cache-Control", "no-store");
+      reply.json(result);
+    } catch (error) {
+      sendInternalAuthError(reply, error);
+    }
+  });
+
+  router.get("/business", async (request, reply) => {
+    if (request.gatewayContext?.authenticated && request.gatewayContext.principal) {
+      const principal = request.gatewayContext.principal;
+      reply.setHeader("Cache-Control", "no-store");
+      reply.json({
+        status: "ok",
+        subject: principal.subject,
+        username: principal.username,
+        email: principal.email,
+        roles: principal.roles,
+        utcTime: new Date().toISOString(),
+      });
+      return;
+    }
+
+    try {
+      const token = extractBearerToken(request.headers.authorization);
+      const claims = await authorizeBusinessAccess(token);
+      reply.setHeader("Cache-Control", "no-store");
+      reply.json({
+        status: "ok",
+        subject: claims.sub,
+        scope: claims.scope,
+        utcTime: new Date().toISOString(),
+      });
+    } catch (error) {
+      sendInternalAuthError(reply, error);
+    }
   });
 
   router.get("/health/verbose", async (request, reply) => {

@@ -1,9 +1,10 @@
 image: gitpod/workspace-node-lts
 
 tasks:
-  - name: setup
+  - name: bootstrap
     init: |
       [ -f .env ] || cp .env.example .env
+      mkdir -p data .runtime
       npm ci
       npm run prisma:generate
       npm run prisma:push
@@ -11,10 +12,12 @@ tasks:
 
 ports:
   - port: 8000
+    name: Daily News Agent
     onOpen: open-preview
-    visibility: public
+    visibility: private
 
 vscode:
   extensions:
     - dbaeumer.vscode-eslint
     - esbenp.prettier-vscode
+    - Prisma.prisma
